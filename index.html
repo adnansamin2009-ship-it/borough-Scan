@@ -1,0 +1,1814 @@
+                                                                                                                                                                                                                                                                                                                                                                                                                                                        <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>EcoScan NYC — Clean NYC One Scan at a Time</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet.js: free interactive maps, no API key needed -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Google Fonts: Inter for body text, Syne for headings -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind custom theme configuration -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary:        '#10b981',
+            'primary-dark': '#059669',
+            'primary-light':'#d1fae5',
+            earth:          '#78716c',
+            'earth-dark':   '#292524',
+            cream:          '#fafaf9',
+          },
+          fontFamily: {
+            sans:    ['Inter', 'sans-serif'],
+            display: ['Syne', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* Base font settings */
+    body { font-family: 'Inter', sans-serif; }
+    h1, h2, h3, h4 { font-family: 'Syne', sans-serif; }
+
+    /* PAGE SWITCHING — all pages hidden by default, .active shows one */
+    .page { display: none; }
+    .page.active {
+      display: block;
+      animation: pageFadeIn 0.28s ease both;
+    }
+    @keyframes pageFadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+
+    /* Map container must have an explicit height for Leaflet to render */
+    #map-container {
+      height: calc(100dvh - 200px);
+      min-height: 360px;
+    }
+
+    /* Hide horizontal scrollbar on filter tabs row */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Custom select arrow (iOS-compatible) */
+    .custom-select {
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+
+    /* Bottom tab bar: leave room for iOS home indicator */
+    .bottom-tab-bar {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* Active tab button in bottom bar */
+    .tab-btn.active span:last-child { color: #10b981; }
+    .tab-btn.active span:first-child { filter: none; }
+
+    /* Leaflet popup font override */
+    .leaflet-popup-content { font-family: 'Inter', sans-serif !important; }
+  </style>
+</head>
+
+<body class="bg-cream text-earth-dark">
+
+<!-- ═══════════════════════════════════════════════════════
+     TOP NAVIGATION BAR — fixed, always visible
+════════════════════════════════════════════════════════ -->
+<nav class="fixed top-0 left-0 right-0 z-50 shadow-lg" style="background:#059669;">
+  <div class="max-w-2xl mx-auto px-4">
+    <div class="flex items-center justify-between h-14">
+
+      <!-- Logo / home button -->
+      <button onclick="showPage('home')" class="flex items-center gap-2 shrink-0">
+        <span class="text-2xl leading-none">🌿</span>
+        <span class="font-display text-white text-[16px] font-bold tracking-tight leading-none">
+          EcoScan <span class="text-white font-extrabold">NYC</span>
+        </span>
+      </button>
+
+      <!-- Desktop nav links (hidden on mobile — use bottom tab bar instead) -->
+      <div class="hidden md:flex items-center gap-0.5">
+        <button onclick="showPage('home')"    data-page="home"    class="nav-top-link px-3 py-1.5 text-sm text-white/80 hover:text-white hover:bg-white/15 rounded-lg transition-colors font-medium">Home</button>
+        <button onclick="showPage('scan')"    data-page="scan"    class="nav-top-link px-3 py-1.5 text-sm text-white/80 hover:text-white hover:bg-white/15 rounded-lg transition-colors font-medium">Scan</button>
+        <button onclick="showPage('reports')" data-page="reports" class="nav-top-link px-3 py-1.5 text-sm text-white/80 hover:text-white hover:bg-white/15 rounded-lg transition-colors font-medium">Reports</button>
+        <button onclick="showPage('impact')"  data-page="impact"  class="nav-top-link px-3 py-1.5 text-sm text-white/80 hover:text-white hover:bg-white/15 rounded-lg transition-colors font-medium">My Impact</button>
+        <button onclick="showPage('map')"     data-page="map"     class="nav-top-link px-3 py-1.5 text-sm text-white/80 hover:text-white hover:bg-white/15 rounded-lg transition-colors font-medium">Map</button>
+        <button onclick="showPage('about')"   data-page="about"   class="nav-top-link px-3 py-1.5 text-sm text-white/80 hover:text-white hover:bg-white/15 rounded-lg transition-colors font-medium">About</button>
+      </div>
+
+      <!-- Mobile: quick Scan button + hamburger -->
+      <div class="flex items-center gap-2 md:hidden">
+        <button onclick="showPage('scan')"
+                class="bg-white text-primary font-bold text-xs px-3.5 py-1.5 rounded-full shadow-sm"
+                style="color:#059669;">
+          📷 Scan
+        </button>
+        <button id="hamburger-btn" onclick="toggleMobileMenu()"
+                class="p-1.5 text-white rounded-lg hover:bg-white/10 transition-colors">
+          <svg id="icon-open"  class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          <svg id="icon-close" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mobile dropdown menu -->
+  <div id="mobile-menu" class="hidden md:hidden bg-earth-dark border-t border-white/10">
+    <div class="max-w-2xl mx-auto px-4 py-2 flex flex-col gap-0.5">
+      <button onclick="showPage('home');closeMobileMenu()"    data-page="home"    class="nav-top-link text-left px-3 py-2.5 text-sm text-white/75 hover:text-primary hover:bg-white/5 rounded-xl transition-colors">🏠 Home</button>
+      <button onclick="showPage('scan');closeMobileMenu()"    data-page="scan"    class="nav-top-link text-left px-3 py-2.5 text-sm text-white/75 hover:text-primary hover:bg-white/5 rounded-xl transition-colors">📷 Scan Litter</button>
+      <button onclick="showPage('reports');closeMobileMenu()" data-page="reports" class="nav-top-link text-left px-3 py-2.5 text-sm text-white/75 hover:text-primary hover:bg-white/5 rounded-xl transition-colors">📋 Reports</button>
+      <button onclick="showPage('impact');closeMobileMenu()"  data-page="impact"  class="nav-top-link text-left px-3 py-2.5 text-sm text-white/75 hover:text-primary hover:bg-white/5 rounded-xl transition-colors">🏆 My Impact</button>
+      <button onclick="showPage('map');closeMobileMenu()"     data-page="map"     class="nav-top-link text-left px-3 py-2.5 text-sm text-white/75 hover:text-primary hover:bg-white/5 rounded-xl transition-colors">🗺️ Neighborhood Map</button>
+      <button onclick="showPage('about');closeMobileMenu()"   data-page="about"   class="nav-top-link text-left px-3 py-2.5 text-sm text-white/75 hover:text-primary hover:bg-white/5 rounded-xl transition-colors">ℹ️ About</button>
+    </div>
+  </div>
+</nav>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN CONTENT AREA
+     pt-14 = clears fixed top nav (56px)
+     pb-20 md:pb-4 = clears fixed bottom tab bar on mobile
+════════════════════════════════════════════════════════ -->
+<main class="max-w-2xl mx-auto pt-14 pb-20 md:pb-4">
+
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: HOME
+  ═══════════════════════════════════════════════ -->
+  <div id="page-home" class="page active">
+
+    <!-- ── HERO: full-bleed background photo + dark overlay ── -->
+    <!--
+      The hero sits OUTSIDE the max-w-2xl main container so it can
+      stretch edge-to-edge. We use a negative margin trick to break out.
+    -->
+    <div class="hero-section relative -mx-0 overflow-hidden"
+         style="
+           min-height: 88svh;
+           background-image:
+             linear-gradient(to bottom,
+               rgba(10, 30, 15, 0.72) 0%,
+               rgba(5,  40, 18, 0.80) 55%,
+               rgba(10, 30, 15, 0.90) 100%),
+             url('https://images.unsplash.com/photo-1568515387631-8b650bbcdb90?w=1200&q=80');
+           background-size: cover;
+           background-position: center 35%;
+         ">
+
+      <!-- Content centred inside the hero -->
+      <div class="flex flex-col items-center justify-center text-center px-5 pt-12 pb-14 min-h-[88svh]">
+
+        <!-- NYC badge -->
+        <div class="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-emerald-300 text-xs font-semibold tracking-widest uppercase px-4 py-1.5 rounded-full mb-7 backdrop-blur-sm">
+          <span class="w-1.5 h-1.5 bg-primary rounded-full animate-pulse inline-block"></span>
+          New York City
+        </div>
+
+        <!-- Main headline -->
+        <h1 class="font-display font-extrabold text-white leading-tight mb-5"
+            style="font-size: clamp(2rem, 8vw, 3rem);">
+          Clean NYC<br/>
+          <span style="color:#10b981;">One Scan at a Time</span>
+        </h1>
+
+        <!-- Sub-headline — uses the required main idea text -->
+        <p class="text-white/75 text-base leading-relaxed mb-10 max-w-sm mx-auto">
+          Help residents across New York City quickly report litter using their phone.
+          Take a photo, choose the waste type, log the report, earn points, and see
+          the impact in our community. 🌱
+        </p>
+
+        <!-- PRIMARY CTA — solid bright green, big, impossible to miss -->
+        <button
+          onclick="showPage('scan')"
+          class="w-full max-w-xs flex items-center justify-center gap-3 font-bold text-lg text-white rounded-2xl py-5 mb-4 active:scale-95 transition-all shadow-2xl"
+          style="background:#10b981; box-shadow: 0 8px 30px rgba(16,185,129,0.55);">
+          📷 &nbsp;Start Scanning
+        </button>
+
+        <!-- Secondary CTA — solid white, still clearly readable -->
+        <button
+          onclick="showPage('map')"
+          class="w-full max-w-xs flex items-center justify-center gap-2 bg-white font-semibold text-base rounded-2xl py-4 active:scale-95 transition-all shadow-lg"
+          style="color:#059669;">
+          🗺️ &nbsp;View Neighborhood Map
+        </button>
+
+        <!-- Live stat pills -->
+        <div class="flex items-center gap-4 mt-10 flex-wrap justify-center">
+          <div class="flex items-center gap-1.5 bg-black/30 border border-white/15 backdrop-blur-sm text-white text-xs font-semibold px-3.5 py-2 rounded-full">
+            📋 <span id="home-stat-reports">—</span> reports
+          </div>
+          <div class="flex items-center gap-1.5 bg-black/30 border border-white/15 backdrop-blur-sm text-white text-xs font-semibold px-3.5 py-2 rounded-full">
+            ⭐ <span id="home-stat-pts">—</span> pts earned
+          </div>
+          <div class="flex items-center gap-1.5 bg-black/30 border border-white/15 backdrop-blur-sm text-white text-xs font-semibold px-3.5 py-2 rounded-full">
+            🏘️ 5 neighborhoods
+          </div>
+        </div>
+
+      </div><!-- /hero content -->
+    </div><!-- /hero-section -->
+
+
+    <!-- ── QUICK-ACTION ROW ── -->
+    <div class="grid grid-cols-2 gap-3 px-4 py-5">
+
+      <button onclick="showPage('reports')"
+              class="flex flex-col items-center gap-2 bg-white border border-stone-100 rounded-2xl py-5 shadow-sm active:bg-stone-50 transition-all">
+        <span class="text-2xl">📋</span>
+        <span class="font-semibold text-sm text-earth-dark">Reports</span>
+      </button>
+
+      <button onclick="showPage('impact')"
+              class="flex flex-col items-center gap-2 bg-white border border-stone-100 rounded-2xl py-5 shadow-sm active:bg-stone-50 transition-all">
+        <span class="text-2xl">🏆</span>
+        <span class="font-semibold text-sm text-earth-dark">My Impact</span>
+      </button>
+
+    </div>
+
+
+    <!-- ── HOW IT WORKS ── -->
+    <div class="px-4 pb-5">
+      <h2 class="font-display text-lg font-bold text-earth-dark mb-4">How It Works</h2>
+
+      <!-- Horizontal stepper cards -->
+      <div class="grid grid-cols-3 gap-2.5">
+
+        <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-stone-100 flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg mb-2 shrink-0" style="background:#d1fae5;">📷</div>
+          <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-extrabold mb-1.5" style="background:#10b981;">1</div>
+          <div class="font-bold text-xs text-earth-dark leading-tight">Snap a Photo</div>
+          <div class="text-[10px] text-earth mt-1 leading-relaxed">Point at litter &amp; shoot</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-stone-100 flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg mb-2 shrink-0" style="background:#d1fae5;">📋</div>
+          <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-extrabold mb-1.5" style="background:#10b981;">2</div>
+          <div class="font-bold text-xs text-earth-dark leading-tight">Log the Waste</div>
+          <div class="text-[10px] text-earth mt-1 leading-relaxed">Pick type &amp; location</div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-stone-100 flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg mb-2 shrink-0" style="background:#d1fae5;">🏆</div>
+          <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-extrabold mb-1.5" style="background:#10b981;">3</div>
+          <div class="font-bold text-xs text-earth-dark leading-tight">Earn Points</div>
+          <div class="text-[10px] text-earth mt-1 leading-relaxed">Badges &amp; map pins</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── RECENT REPORTS ── -->
+    <div class="px-4 pb-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-base font-bold text-earth-dark">Recent Reports</h2>
+        <button onclick="showPage('reports')" class="text-xs font-semibold" style="color:#10b981;">View all →</button>
+      </div>
+      <!-- Empty state shown when no reports yet -->
+      <div id="home-recent-empty" class="hidden bg-white border border-dashed border-stone-200 rounded-2xl py-8 text-center">
+        <div class="text-3xl mb-2">📭</div>
+        <p class="text-earth text-sm">No reports yet — be the first!</p>
+      </div>
+      <div id="home-recent" class="space-y-2">
+        <!-- filled by renderHomePage() in JS -->
+      </div>
+    </div>
+
+
+    <!-- ── BOTTOM CTA BANNER ── -->
+    <div class="mx-4 mb-6 rounded-2xl overflow-hidden relative shadow-lg"
+         style="
+           background-image:
+             linear-gradient(135deg, rgba(5,150,105,0.92), rgba(4,120,87,0.95)),
+             url('https://images.unsplash.com/photo-1568515387631-8b650bbcdb90?w=600&q=60');
+           background-size: cover;
+           background-position: center;
+         ">
+      <div class="px-6 py-7 text-center text-white relative z-10">
+        <div class="text-3xl mb-2">🌿</div>
+        <div class="font-display text-lg font-bold mb-1">Ready to make a difference?</div>
+        <p class="text-white/75 text-sm mb-5 max-w-xs mx-auto">
+          Every single report moves us closer to a cleaner New York City.
+        </p>
+        <button onclick="showPage('scan')"
+                class="bg-white font-bold text-sm px-8 py-3 rounded-xl active:scale-95 transition-all shadow-md"
+                style="color:#059669;">
+          Start Your First Scan →
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /page-home -->
+
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: SCAN
+  ═══════════════════════════════════════════════ -->
+  <div id="page-scan" class="page">
+
+    <!-- ── STEP 1: Choose how to get the photo ── -->
+    <div id="scan-step1">
+
+      <div class="px-4 pt-6 pb-4">
+        <h2 class="font-display text-2xl text-earth-dark mb-1">Scan Litter 📷</h2>
+        <p class="text-earth text-sm">Take a photo or choose one from your gallery.</p>
+      </div>
+
+      <!-- Live camera preview (shown when getUserMedia succeeds) -->
+      <div id="live-camera-area" class="hidden px-4 mb-4">
+        <div class="relative bg-black rounded-2xl overflow-hidden" style="aspect-ratio:4/3">
+          <video id="camera-video" autoplay playsinline class="w-full h-full object-cover"></video>
+          <!-- Targeting brackets overlay -->
+          <div class="absolute inset-0 pointer-events-none">
+            <div class="absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 border-primary rounded-tl-xl"></div>
+            <div class="absolute top-3 right-3 w-7 h-7 border-t-2 border-r-2 border-primary rounded-tr-xl"></div>
+            <div class="absolute bottom-3 left-3 w-7 h-7 border-b-2 border-l-2 border-primary rounded-bl-xl"></div>
+            <div class="absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 border-primary rounded-br-xl"></div>
+            <div class="absolute bottom-14 left-1/2 -translate-x-1/2 text-white/50 text-xs">Point at litter and capture</div>
+          </div>
+        </div>
+        <div class="flex gap-3 mt-3">
+          <button onclick="captureFromCamera()"
+                  class="flex-1 bg-primary text-white font-bold py-4 rounded-2xl text-base active:scale-95 transition-all shadow-md shadow-primary/30">
+            📸 Capture Photo
+          </button>
+          <button onclick="stopCamera(true)"
+                  class="px-5 py-4 bg-stone-100 text-earth rounded-2xl font-semibold text-sm active:scale-95 transition-all">
+            ✖ Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- File input area (primary on mobile, fallback otherwise) -->
+      <div id="file-input-area" class="px-4 space-y-3 mb-4">
+
+        <!-- Take Photo button (opens camera on mobile) -->
+        <button onclick="tryCamera()"
+                class="w-full flex items-center gap-4 bg-white border-2 border-primary rounded-2xl px-5 py-4 text-left active:bg-primary-light transition-all shadow-sm">
+          <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-2xl shrink-0">📷</div>
+          <div class="flex-1">
+            <div class="font-display text-base text-earth-dark">Take a Photo</div>
+            <div class="text-earth text-xs mt-0.5">Opens your phone's camera</div>
+          </div>
+          <svg class="w-4 h-4 text-earth/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <!--
+          capture="environment" = opens rear camera directly on mobile.
+          If getUserMedia isn't available, tryCamera() falls back to clicking this input.
+        -->
+        <input id="camera-capture-input" type="file" accept="image/*" capture="environment"
+               class="hidden" onchange="handleFileSelect(this)" />
+
+        <!-- Upload from Gallery button -->
+        <button onclick="document.getElementById('gallery-input').click()"
+                class="w-full flex items-center gap-4 bg-white border-2 border-stone-200 hover:border-stone-300 rounded-2xl px-5 py-4 text-left active:bg-stone-50 transition-all shadow-sm">
+          <div class="w-12 h-12 bg-stone-100 rounded-xl flex items-center justify-center text-2xl shrink-0">🖼️</div>
+          <div class="flex-1">
+            <div class="font-display text-base text-earth-dark">Upload from Gallery</div>
+            <div class="text-earth text-xs mt-0.5">Choose an existing photo</div>
+          </div>
+          <svg class="w-4 h-4 text-earth/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <input id="gallery-input" type="file" accept="image/*"
+               class="hidden" onchange="handleFileSelect(this)" />
+
+      </div>
+
+      <!-- Tip -->
+      <div class="mx-4 bg-primary-light border border-emerald-200 rounded-xl p-3">
+        <p class="text-emerald-800 text-xs leading-relaxed">
+          <strong>💡 Tip:</strong> A clear photo showing the litter and surroundings helps identify the exact location. You don't need a perfect shot — just close enough to see the waste type.
+        </p>
+      </div>
+
+    </div><!-- /scan-step1 -->
+
+
+    <!-- ── STEP 2: Photo preview + report form ── -->
+    <div id="scan-step2" class="hidden px-4 pt-6 pb-8">
+
+      <h2 class="font-display text-2xl text-earth-dark mb-1">Log the Report 📋</h2>
+      <p class="text-earth text-sm mb-5">Great shot! Fill in the quick details below.</p>
+
+      <!-- Photo preview with retake button -->
+      <div class="relative mb-5">
+        <img id="photo-preview-img" src="" alt="Captured litter"
+             class="w-full max-h-60 object-cover rounded-2xl bg-stone-200 border border-stone-200" />
+        <button onclick="retakePhoto()"
+                class="absolute top-2.5 right-2.5 bg-black/55 hover:bg-black/70 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm transition-colors">
+          🔄 Retake
+        </button>
+      </div>
+
+      <!-- Hidden: stores the compressed photo data URL -->
+      <input type="hidden" id="current-photo-data" value="" />
+
+      <!-- Report form -->
+      <form id="report-form" onsubmit="submitReport(event)" class="space-y-5">
+
+        <!-- Waste type dropdown -->
+        <div>
+          <label class="block text-sm font-semibold text-earth-dark mb-2">
+            🗑️ Waste Type <span class="text-red-400">*</span>
+          </label>
+          <select id="form-waste-type" required
+                  class="custom-select w-full bg-white border-2 border-stone-200 focus:border-primary rounded-xl px-4 py-3.5 text-sm text-earth-dark outline-none transition-colors">
+            <option value="">— Select waste type —</option>
+            <option value="Plastic">🥤 Plastic (bottles, bags, wrappers)</option>
+            <option value="Paper">📄 Paper / Cardboard</option>
+            <option value="Glass">🍾 Glass</option>
+            <option value="Metal">🥫 Metal (cans, foil)</option>
+            <option value="Organic">🍌 Organic / Food Waste</option>
+            <option value="Other">♻️ Other</option>
+          </select>
+        </div>
+
+        <!-- Location — Step 1: choose borough -->
+        <div>
+          <label class="block text-sm font-semibold text-earth-dark mb-2">
+            🏙️ Borough <span class="text-red-400">*</span>
+          </label>
+          <select id="form-borough" required onchange="populateLocations(this)"
+                  class="custom-select w-full bg-white border-2 border-stone-200 focus:border-primary rounded-xl px-4 py-3.5 text-sm text-earth-dark outline-none transition-colors">
+            <option value="">— Select a borough —</option>
+            <option value="Manhattan">🌆 Manhattan</option>
+            <option value="Brooklyn">🌉 Brooklyn</option>
+            <option value="Bronx">🏟️ The Bronx</option>
+            <option value="Queens">✈️ Queens</option>
+            <option value="Staten Island">🚢 Staten Island</option>
+          </select>
+        </div>
+
+        <!-- Location — Step 2: choose street (filled by JS after borough selected) -->
+        <div id="location-step2" class="hidden">
+          <label class="block text-sm font-semibold text-earth-dark mb-2">
+            📍 Location <span class="text-red-400">*</span>
+          </label>
+          <select id="form-location" required onchange="toggleCustomLocation(this)"
+                  class="custom-select w-full bg-white border-2 border-stone-200 focus:border-primary rounded-xl px-4 py-3.5 text-sm text-earth-dark outline-none transition-colors">
+            <option value="">— Select a street / spot —</option>
+          </select>
+          <!-- Free-text field shown when user picks "other" -->
+          <input id="custom-location-input" type="text"
+                 placeholder="e.g. 125th St & Lenox Ave, Harlem"
+                 class="hidden w-full mt-2 bg-white border-2 border-stone-200 focus:border-primary rounded-xl px-4 py-3.5 text-sm text-earth-dark outline-none transition-colors" />
+        </div>
+
+        <!-- Notes (optional) -->
+        <div>
+          <label class="block text-sm font-semibold text-earth-dark mb-2">
+            📝 Notes
+            <span class="font-normal text-stone-400 text-xs ml-1">(optional)</span>
+          </label>
+          <textarea id="form-notes" rows="2"
+                    placeholder="e.g. Large pile of bags near the trash can, has been there for 3 days"
+                    class="w-full bg-white border-2 border-stone-200 focus:border-primary rounded-xl px-4 py-3 text-sm text-earth-dark outline-none resize-none transition-colors leading-relaxed"></textarea>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit"
+                class="w-full bg-primary hover:bg-primary-dark text-white font-bold text-base py-4 rounded-2xl shadow-lg shadow-primary/30 active:scale-95 transition-all">
+          🚀 Submit Report — Earn Points!
+        </button>
+
+        <p class="text-center text-xs text-stone-400">
+          Reports are saved in your browser. No account required.
+        </p>
+      </form>
+
+    </div><!-- /scan-step2 -->
+
+
+    <!-- ── STEP 3: Success confirmation ── -->
+    <div id="scan-step3" class="hidden px-4 pt-10 pb-8 text-center">
+
+      <div class="text-6xl mb-4" style="animation: bounce 1s infinite;">🎉</div>
+      <h2 class="font-display text-2xl text-earth-dark mb-2">Report Submitted!</h2>
+      <p class="text-earth text-sm mb-8 max-w-xs mx-auto leading-relaxed">
+        Thank you for helping keep New York City clean. Every single report counts!
+      </p>
+
+      <!-- Points earned card -->
+      <div class="bg-gradient-to-br from-primary to-emerald-600 rounded-2xl p-5 text-white mb-6 max-w-xs mx-auto shadow-lg shadow-primary/25">
+        <div class="font-display text-4xl font-extrabold mb-0.5" id="points-earned-display">+10 pts</div>
+        <div class="text-white/75 text-sm">Points Earned This Report</div>
+        <div class="mt-3 pt-3 border-t border-white/20 text-sm">
+          Your total: <span id="total-points-display" class="font-bold">0 pts</span>
+        </div>
+      </div>
+
+      <!-- What to do next -->
+      <div class="flex flex-col gap-3 max-w-xs mx-auto">
+        <button onclick="startNewScan()"
+                class="w-full bg-primary text-white font-bold py-3.5 rounded-2xl active:scale-95 transition-all">
+          📷 Scan Another Piece of Litter
+        </button>
+        <button onclick="showPage('reports')"
+                class="w-full bg-white border border-stone-200 text-earth-dark font-semibold py-3.5 rounded-2xl active:scale-95 transition-all">
+          📋 View Reports
+        </button>
+        <button onclick="showPage('impact')"
+                class="w-full bg-white border border-stone-200 text-earth-dark font-semibold py-3.5 rounded-2xl active:scale-95 transition-all">
+          🏆 Check My Impact Dashboard
+        </button>
+      </div>
+
+    </div><!-- /scan-step3 -->
+
+  </div><!-- /page-scan -->
+
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: MY REPORTS
+  ═══════════════════════════════════════════════ -->
+  <div id="page-reports" class="page">
+
+    <!-- Header row -->
+    <div class="px-4 pt-6 pb-3 flex items-start justify-between">
+      <div>
+        <h2 class="font-display text-2xl text-earth-dark">Reports 📋</h2>
+        <p class="text-earth text-xs mt-0.5">All litter reported across NYC — most recent first</p>
+      </div>
+      <span id="reports-count-badge"
+            class="bg-primary-light text-primary text-xs font-bold px-2.5 py-1 rounded-full mt-1 shrink-0">
+        0
+      </span>
+    </div>
+
+    <!-- Waste type filter tabs -->
+    <div class="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
+      <button onclick="filterReports('all')"     data-filter="all"     class="filter-tab shrink-0 bg-primary text-white text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">All Types</button>
+      <button onclick="filterReports('Plastic')" data-filter="Plastic" class="filter-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🥤 Plastic</button>
+      <button onclick="filterReports('Paper')"   data-filter="Paper"   class="filter-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">📄 Paper</button>
+      <button onclick="filterReports('Glass')"   data-filter="Glass"   class="filter-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🍾 Glass</button>
+      <button onclick="filterReports('Metal')"   data-filter="Metal"   class="filter-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🥫 Metal</button>
+      <button onclick="filterReports('Organic')" data-filter="Organic" class="filter-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🍌 Organic</button>
+    </div>
+
+    <!-- Borough location filter tabs -->
+    <div class="px-4 pb-3 flex gap-2 overflow-x-auto no-scrollbar">
+      <button onclick="filterBorough('all')"           data-borough="all"           class="borough-tab shrink-0 bg-earth-dark text-white text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">All Boroughs</button>
+      <button onclick="filterBorough('Manhattan')"     data-borough="Manhattan"     class="borough-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🌆 Manhattan</button>
+      <button onclick="filterBorough('Brooklyn')"      data-borough="Brooklyn"      class="borough-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🌉 Brooklyn</button>
+      <button onclick="filterBorough('Bronx')"         data-borough="Bronx"         class="borough-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🏟️ Bronx</button>
+      <button onclick="filterBorough('Queens')"        data-borough="Queens"        class="borough-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">✈️ Queens</button>
+      <button onclick="filterBorough('Staten Island')" data-borough="Staten Island" class="borough-tab shrink-0 bg-stone-100 text-earth text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all">🚢 SI</button>
+    </div>
+
+    <!-- Reports list (filled by JS) -->
+    <div id="reports-list" class="px-4 pb-8 space-y-3"></div>
+
+    <!-- Empty state -->
+    <div id="reports-empty" class="hidden px-4 py-16 text-center">
+      <div class="text-5xl mb-4">📭</div>
+      <div class="font-display text-lg text-earth-dark mb-2">No reports yet</div>
+      <p class="text-earth text-sm mb-6 max-w-xs mx-auto">Be the first to report litter on your block!</p>
+      <button onclick="showPage('scan')"
+              class="bg-primary text-white font-semibold px-6 py-3 rounded-2xl active:scale-95 transition-all">
+        📷 Start Scanning
+      </button>
+    </div>
+
+  </div><!-- /page-reports -->
+
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: MY IMPACT
+  ═══════════════════════════════════════════════ -->
+  <div id="page-impact" class="page">
+
+    <div class="px-4 pt-6 pb-3">
+      <h2 class="font-display text-2xl text-earth-dark mb-1">My Impact 🏆</h2>
+      <p class="text-earth text-sm">Your personal contribution to a cleaner NYC.</p>
+    </div>
+
+    <!-- Points + level hero card -->
+    <div class="mx-4 mb-4 rounded-2xl p-5 text-white relative overflow-hidden shadow-lg"
+         style="background: linear-gradient(135deg, #064e3b, #059669);">
+      <div class="absolute -top-8 -right-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute -bottom-6 -left-6 w-28 h-28 bg-black/10 rounded-full blur-xl pointer-events-none"></div>
+
+      <!-- Welcome bonus banner (shown once) -->
+      <div id="welcome-bonus-banner"
+           class="hidden bg-white/15 border border-white/25 rounded-xl px-3 py-2 mb-4 flex items-center gap-2 text-xs font-semibold">
+        🎉 Welcome bonus! You got +10 points for joining EcoScan NYC.
+      </div>
+
+      <div class="flex items-center justify-between relative z-10 mb-4">
+        <div>
+          <div class="text-white/60 text-xs uppercase tracking-widest mb-1">Total Points</div>
+          <div class="font-display font-extrabold text-white leading-none" style="font-size:3.2rem;" id="impact-points">10</div>
+        </div>
+        <div class="text-right">
+          <div class="text-4xl mb-1" id="impact-level-emoji">🌱</div>
+          <div class="text-xs text-white/70 font-semibold" id="impact-level-name">Eco Beginner</div>
+        </div>
+      </div>
+
+      <!-- Progress bar toward next level -->
+      <div>
+        <div class="flex justify-between text-xs text-white/50 mb-1.5">
+          <span id="impact-level-next"></span>
+          <span id="impact-progress-label"></span>
+        </div>
+        <div class="h-2 bg-white/15 rounded-full overflow-hidden">
+          <div id="impact-progress-bar" class="h-full bg-white rounded-full transition-all duration-700" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="mx-4 grid grid-cols-3 gap-2.5 mb-4">
+      <div class="bg-white border border-stone-100 rounded-2xl p-3 shadow-sm text-center">
+        <div class="font-display text-3xl font-extrabold text-primary leading-none" id="impact-user-count">0</div>
+        <div class="text-earth text-[10px] mt-1 leading-tight">Your<br/>Reports</div>
+      </div>
+      <div class="bg-white border border-stone-100 rounded-2xl p-3 shadow-sm text-center">
+        <div class="font-display text-3xl font-extrabold text-primary leading-none" id="impact-points-stat">10</div>
+        <div class="text-earth text-[10px] mt-1 leading-tight">Total<br/>Points</div>
+      </div>
+      <div class="bg-white border border-stone-100 rounded-2xl p-3 shadow-sm text-center">
+        <div class="font-display text-3xl font-extrabold text-primary leading-none" id="impact-badges-count">0</div>
+        <div class="text-earth text-[10px] mt-1 leading-tight">Badges<br/>Earned</div>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="mx-4 mb-4">
+      <h3 class="font-display text-base text-earth-dark mb-3">Badges 🎖️</h3>
+      <div id="badges-grid" class="grid grid-cols-3 gap-3">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Your Activity (photo feed) -->
+    <div class="mx-4 mb-4">
+      <h3 class="font-display text-base text-earth-dark mb-3">Your Activity 📸</h3>
+      <div id="activity-feed" class="space-y-3"></div>
+      <div id="activity-empty" class="hidden bg-white border border-dashed border-stone-200 rounded-2xl py-8 text-center">
+        <div class="text-3xl mb-2">📷</div>
+        <p class="text-earth text-sm">Submit your first scan to see activity here!</p>
+      </div>
+    </div>
+
+    <!-- Waste type breakdown -->
+    <div class="mx-4 bg-white rounded-2xl p-5 shadow-sm border border-stone-100 mb-4">
+      <h3 class="font-display text-base text-earth-dark mb-4">Waste Breakdown ♻️</h3>
+      <div id="waste-breakdown" class="space-y-3.5"></div>
+      <div id="breakdown-empty" class="text-center py-3 text-earth text-sm">
+        Submit reports to see your breakdown!
+      </div>
+    </div>
+
+    <!-- Borough leaderboard -->
+    <div class="mx-4 bg-white rounded-2xl p-5 shadow-sm border border-stone-100 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display text-base text-earth-dark">Borough Leaderboard 🏙️</h3>
+        <span class="text-xs text-earth bg-stone-100 px-2.5 py-1 rounded-full">by total reports</span>
+      </div>
+      <div id="borough-leaderboard" class="space-y-2.5"></div>
+    </div>
+
+  </div><!-- /page-impact -->
+
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: NEIGHBORHOOD MAP
+  ═══════════════════════════════════════════════ -->
+  <div id="page-map" class="page">
+
+    <div class="px-4 pt-6 pb-3">
+      <h2 class="font-display text-2xl text-earth-dark mb-1">Neighborhood Map 🗺️</h2>
+      <p class="text-earth text-sm">Litter reports across all five NYC boroughs.</p>
+    </div>
+
+    <!-- Map legend chips -->
+    <div class="px-4 pb-3 flex flex-wrap gap-2">
+      <span class="text-xs bg-white border border-stone-200 text-earth px-2.5 py-1 rounded-full shadow-sm">🥤 Plastic</span>
+      <span class="text-xs bg-white border border-stone-200 text-earth px-2.5 py-1 rounded-full shadow-sm">📄 Paper</span>
+      <span class="text-xs bg-white border border-stone-200 text-earth px-2.5 py-1 rounded-full shadow-sm">🍾 Glass</span>
+      <span class="text-xs bg-white border border-stone-200 text-earth px-2.5 py-1 rounded-full shadow-sm">🥫 Metal</span>
+      <span class="text-xs bg-white border border-stone-200 text-earth px-2.5 py-1 rounded-full shadow-sm">🍌 Organic</span>
+    </div>
+
+    <!-- Leaflet map — height set in <style> above -->
+    <div id="map-container" class="mx-4 rounded-2xl overflow-hidden border border-stone-200 shadow-md"></div>
+
+  </div><!-- /page-map -->
+
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: ABOUT
+  ═══════════════════════════════════════════════ -->
+  <div id="page-about" class="page">
+
+    <div class="px-4 pt-6 pb-4">
+      <h2 class="font-display text-2xl text-earth-dark mb-1">About EcoScan NYC ℹ️</h2>
+      <p class="text-earth text-sm">Why we built this — and why it matters.</p>
+    </div>
+
+    <div class="px-4 pb-8 space-y-4">
+
+      <!-- Why litter matters -->
+      <div class="bg-gradient-to-br from-primary-light to-emerald-50 border border-emerald-200 rounded-2xl p-5">
+        <h3 class="font-display text-base text-emerald-900 mb-2">🌍 Why Litter Is a Real Problem</h3>
+        <p class="text-emerald-800 text-sm leading-relaxed mb-3">
+          New York City generates millions of pounds of street litter every year. Litter isn't just ugly — it clogs drains and causes flooding, harms animals, pollutes our soil and waterways, and makes neighborhoods feel unsafe and unloved.
+        </p>
+        <p class="text-emerald-800 text-sm leading-relaxed">
+          Most people want cleaner streets, but there was never a simple, fast way to report litter from your phone. <strong>EcoScan changes that.</strong>
+        </p>
+      </div>
+
+      <!-- Our goal -->
+      <div class="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
+        <h3 class="font-display text-base text-earth-dark mb-2">🎯 Our Goal</h3>
+        <p class="text-earth text-sm leading-relaxed mb-3">
+          EcoScan NYC gives every New Yorker — in every borough — a simple tool to fight litter in their neighborhood. Take a photo, log the type of waste, and submit it in under 30 seconds.
+        </p>
+        <p class="text-earth text-sm leading-relaxed">
+          Over time, those reports build a real picture of where litter is worst across the five boroughs — giving communities, schools, and city agencies the data they need to take action.
+        </p>
+      </div>
+
+      <!-- What makes it different -->
+      <div class="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
+        <h3 class="font-display text-base text-earth-dark mb-3">✨ What Makes EcoScan Different</h3>
+        <div class="space-y-3">
+          <div class="flex gap-3 text-sm text-earth">
+            <span class="text-primary font-bold shrink-0 text-base">📷</span>
+            <span><strong class="text-earth-dark">Photo-first reporting</strong> — a photo is worth a thousand words. Every report includes a real image of the litter.</span>
+          </div>
+          <div class="flex gap-3 text-sm text-earth">
+            <span class="text-primary font-bold shrink-0 text-base">🗺️</span>
+            <span><strong class="text-earth-dark">Live neighborhood map</strong> — see every reported litter spot pinned on a real NYC map, across all five boroughs.</span>
+          </div>
+          <div class="flex gap-3 text-sm text-earth">
+            <span class="text-primary font-bold shrink-0 text-base">🏆</span>
+            <span><strong class="text-earth-dark">Points and badges</strong> — community cleanup should feel rewarding. Earn points and unlock badges as you help keep NYC clean.</span>
+          </div>
+          <div class="flex gap-3 text-sm text-earth">
+            <span class="text-primary font-bold shrink-0 text-base">🔒</span>
+            <span><strong class="text-earth-dark">No account needed</strong> — your data stays on your phone. No sign-up, no tracking, no ads. Ever.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- How to use -->
+      <div class="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
+        <h3 class="font-display text-base text-earth-dark mb-3">📖 How to Use EcoScan</h3>
+        <ol class="space-y-2.5 text-sm text-earth">
+          <li class="flex gap-2.5"><span class="text-primary font-bold shrink-0">1.</span>Go to the <strong class="text-earth-dark">Scan</strong> tab and take a photo of litter near you.</li>
+          <li class="flex gap-2.5"><span class="text-primary font-bold shrink-0">2.</span>Choose your <strong class="text-earth-dark">borough</strong>, then select the nearest street or location.</li>
+          <li class="flex gap-2.5"><span class="text-primary font-bold shrink-0">3.</span>Select the <strong class="text-earth-dark">waste type</strong> — Plastic, Paper, Glass, Metal, Organic, or Other.</li>
+          <li class="flex gap-2.5"><span class="text-primary font-bold shrink-0">4.</span>Hit <strong class="text-earth-dark">Submit</strong> — earn 10 pts per report (15 for Glass or Metal)!</li>
+          <li class="flex gap-2.5"><span class="text-primary font-bold shrink-0">5.</span>Check the <strong class="text-earth-dark">Map</strong> and <strong class="text-earth-dark">My Impact</strong> tabs to track your progress.</li>
+        </ol>
+      </div>
+
+      <!-- Tech stack -->
+      <div class="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
+        <h3 class="font-display text-base text-earth-dark mb-3">⚙️ Built With</h3>
+        <div class="space-y-2.5">
+          <div class="flex items-center gap-3 text-sm text-earth"><span class="w-8 h-8 bg-yellow-50 rounded-lg flex items-center justify-center text-sm shrink-0">📄</span>HTML5, CSS3, Vanilla JavaScript — no frameworks</div>
+          <div class="flex items-center gap-3 text-sm text-earth"><span class="w-8 h-8 bg-sky-50 rounded-lg flex items-center justify-center text-sm shrink-0">🎨</span>Tailwind CSS for styling</div>
+          <div class="flex items-center gap-3 text-sm text-earth"><span class="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center text-sm shrink-0">🗺️</span>Leaflet.js — free interactive maps, no API key needed</div>
+          <div class="flex items-center gap-3 text-sm text-earth"><span class="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center text-sm shrink-0">📱</span>getUserMedia API — device camera access in the browser</div>
+          <div class="flex items-center gap-3 text-sm text-earth"><span class="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center text-sm shrink-0">💾</span>localStorage — your data stays on your device, always</div>
+        </div>
+      </div>
+
+      <!-- Footer card -->
+      <div class="rounded-2xl p-5 text-center text-white shadow-sm" style="background:#059669;">
+        <div class="text-3xl mb-2">🌿</div>
+        <div class="font-display text-base font-bold mb-1">EcoScan NYC</div>
+        <p class="text-white/75 text-xs leading-relaxed">
+          Built by a student from New York City.<br/>
+          Real code. Real problem. Real impact.
+        </p>
+      </div>
+
+    </div>
+  </div><!-- /page-about -->
+
+
+</main><!-- /main content -->
+
+
+<!-- ═══════════════════════════════════════════════════════
+     BOTTOM TAB BAR (mobile only — md and up it's hidden)
+     This is the primary navigation method on phones.
+════════════════════════════════════════════════════════ -->
+<nav class="bottom-tab-bar fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 shadow-xl md:hidden">
+  <div class="max-w-2xl mx-auto grid grid-cols-5">
+
+    <button onclick="showPage('home')"    data-tab="home"
+            class="tab-btn flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors">
+      <span class="text-xl leading-none">🏠</span>
+      <span class="text-[10px] font-semibold text-stone-400">Home</span>
+    </button>
+
+    <button onclick="showPage('scan')"    data-tab="scan"
+            class="tab-btn flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors">
+      <span class="text-xl leading-none">📷</span>
+      <span class="text-[10px] font-semibold text-stone-400">Scan</span>
+    </button>
+
+    <button onclick="showPage('reports')" data-tab="reports"
+            class="tab-btn flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors">
+      <span class="text-xl leading-none">📋</span>
+      <span class="text-[10px] font-semibold text-stone-400">Reports</span>
+    </button>
+
+    <button onclick="showPage('impact')"  data-tab="impact"
+            class="tab-btn flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors">
+      <span class="text-xl leading-none">🏆</span>
+      <span class="text-[10px] font-semibold text-stone-400">Impact</span>
+    </button>
+
+    <button onclick="showPage('map')"     data-tab="map"
+            class="tab-btn flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors">
+      <span class="text-xl leading-none">🗺️</span>
+      <span class="text-[10px] font-semibold text-stone-400">Map</span>
+    </button>
+
+  </div>
+</nav>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT — all app logic
+════════════════════════════════════════════════════════ -->
+<script>
+
+// No seed data — all reports come from real user submissions stored in localStorage.
+
+/* ════════════════════════════════════════════════════════
+   LOCALSTORAGE HELPERS
+════════════════════════════════════════════════════════ */
+
+/** Get all reports the current user has submitted */
+function getUserReports() {
+  try {
+    return JSON.parse(localStorage.getItem('ecoscan_reports') || '[]');
+  } catch { return []; }
+}
+
+/** Save a new report (most recent first) */
+function saveUserReport(report) {
+  const reports = getUserReports();
+  reports.unshift(report);
+  try {
+    localStorage.setItem('ecoscan_reports', JSON.stringify(reports));
+  } catch (e) {
+    // localStorage full — remove oldest user report and retry
+    if (reports.length > 1) {
+      reports.pop();
+      localStorage.setItem('ecoscan_reports', JSON.stringify(reports));
+    }
+  }
+}
+
+/** All reports = only real user submissions, newest first */
+function getAllReports() {
+  return getUserReports().sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+/** Get total points — starts at 10 (welcome bonus given on first visit) */
+function getUserPoints() {
+  return parseInt(localStorage.getItem('ecoscan_points') || '10', 10);
+}
+
+/** Add points and persist */
+function addPoints(pts) {
+  localStorage.setItem('ecoscan_points', getUserPoints() + pts);
+}
+
+/**
+ * giveWelcomeBonus()
+ * Gives the user 10 points the very first time they open the app.
+ * The flag 'ecoscan_welcomed' in localStorage prevents it running twice.
+ */
+function giveWelcomeBonus() {
+  if (!localStorage.getItem('ecoscan_welcomed')) {
+    localStorage.setItem('ecoscan_points', '10');
+    localStorage.setItem('ecoscan_welcomed', '1');
+    localStorage.setItem('ecoscan_show_banner', '1'); // banner shows next time Impact page opens
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════════════════════ */
+
+let currentPage = 'home';
+
+/**
+ * showPage(name)
+ * The central navigation function.
+ * Hides every page div, shows the one matching `name`.
+ */
+function showPage(name) {
+  // Stop camera if the user was on the scan page
+  if (currentPage === 'scan' && name !== 'scan') {
+    stopCamera(false);
+    resetScanFlow();
+  }
+
+  currentPage = name;
+
+  // Hide all pages, show the right one
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('page-' + name);
+  if (target) target.classList.add('active');
+
+  // Sync all nav highlights (top bar + bottom tabs)
+  updateNavHighlights(name);
+
+  // Page-specific setup
+  if (name === 'home')    renderHomePage();
+  if (name === 'reports') renderReports();
+  if (name === 'impact')  renderImpact();
+  if (name === 'map')     initMap();
+
+  // Scroll to top on every page switch
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+/** Update the green active state on top nav links and bottom tab buttons */
+function updateNavHighlights(name) {
+  // Top nav links
+  document.querySelectorAll('.nav-top-link').forEach(el => {
+    const isActive = el.dataset.page === name;
+    el.classList.toggle('text-primary',   isActive);
+    el.classList.toggle('text-white/65',  !isActive);
+  });
+
+  // Bottom tab bar buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const isActive = btn.dataset.tab === name;
+    const label = btn.querySelector('span:last-child');
+    if (label) {
+      label.classList.toggle('text-primary',    isActive);
+      label.classList.toggle('font-bold',       isActive);
+      label.classList.toggle('text-stone-400',  !isActive);
+    }
+  });
+}
+
+/** Toggle mobile hamburger dropdown */
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobile-menu');
+  const iconOpen  = document.getElementById('icon-open');
+  const iconClose = document.getElementById('icon-close');
+  const isHidden  = menu.classList.toggle('hidden');
+  iconOpen.classList.toggle ('hidden', !isHidden);
+  iconClose.classList.toggle('hidden',  isHidden);
+}
+
+function closeMobileMenu() {
+  document.getElementById('mobile-menu').classList.add('hidden');
+  document.getElementById('icon-open').classList.remove('hidden');
+  document.getElementById('icon-close').classList.add('hidden');
+}
+
+/* ════════════════════════════════════════════════════════
+   SCAN — CAMERA & FILE HANDLING
+════════════════════════════════════════════════════════ */
+
+let cameraStream = null; // holds the active MediaStream
+
+/**
+ * tryCamera()
+ * First tries getUserMedia (live preview with rear camera).
+ * If that fails (no HTTPS, no permission, old browser),
+ * falls back to the file input with capture="environment".
+ */
+async function tryCamera() {
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 } }
+      });
+      const video = document.getElementById('camera-video');
+      video.srcObject = cameraStream;
+      document.getElementById('live-camera-area').classList.remove('hidden');
+      document.getElementById('file-input-area').classList.add('hidden');
+      return; // success — show live preview
+    } catch (err) {
+      console.log('getUserMedia not available:', err.message);
+      // fall through to file input below
+    }
+  }
+  // Fallback: click the hidden file input with capture="environment"
+  // This opens the camera app directly on iOS / Android
+  document.getElementById('camera-capture-input').click();
+}
+
+/**
+ * captureFromCamera()
+ * Draws the current video frame onto a canvas, compresses it,
+ * stops the camera stream, then proceeds to the form.
+ */
+async function captureFromCamera() {
+  const video  = document.getElementById('camera-video');
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const raw = canvas.toDataURL('image/jpeg', 0.7);
+  stopCamera(false);
+  const compressed = await compressImage(raw, 800, 0.65);
+  showPhotoForm(compressed);
+}
+
+/**
+ * stopCamera(resetFlow)
+ * Releases all camera tracks (turns off the camera indicator light).
+ * Optionally resets the scan flow back to step 1.
+ */
+function stopCamera(resetFlow) {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  document.getElementById('live-camera-area').classList.add('hidden');
+  document.getElementById('file-input-area').classList.remove('hidden');
+  if (resetFlow) resetScanFlow();
+}
+
+/**
+ * handleFileSelect(input)
+ * Called when the user picks a file from camera-capture-input or gallery-input.
+ * Reads the file, compresses it, then shows the form.
+ */
+function handleFileSelect(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const compressed = await compressImage(e.target.result, 800, 0.65);
+    showPhotoForm(compressed);
+  };
+  reader.readAsDataURL(input.files[0]);
+  input.value = ''; // reset so the same file can be re-selected
+}
+
+/**
+ * compressImage(dataUrl, maxWidth, quality)
+ * Resizes and re-encodes the image to keep localStorage usage low.
+ * Returns a Promise that resolves to the compressed data URL.
+ */
+function compressImage(dataUrl, maxWidth, quality) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio  = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl); // if compression fails, use original
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * showPhotoForm(photoDataUrl)
+ * Moves from Step 1 (choose photo) → Step 2 (fill form).
+ */
+function showPhotoForm(photoDataUrl) {
+  document.getElementById('photo-preview-img').src = photoDataUrl;
+  document.getElementById('current-photo-data').value = photoDataUrl;
+  document.getElementById('scan-step1').classList.add('hidden');
+  document.getElementById('scan-step2').classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+/** Go back to step 1 (retake / re-upload) */
+function retakePhoto() {
+  document.getElementById('scan-step2').classList.add('hidden');
+  document.getElementById('scan-step1').classList.remove('hidden');
+  document.getElementById('report-form').reset();
+  document.getElementById('current-photo-data').value = '';
+  document.getElementById('custom-location-input').classList.add('hidden');
+}
+
+/* ════════════════════════════════════════════════════════
+   LOCATION CASCADE: borough → streets
+════════════════════════════════════════════════════════ */
+
+const LOCATIONS_BY_BOROUGH = {
+  Manhattan: [
+    'Dyckman St & Broadway, Manhattan',
+    '207th St & Sherman Ave, Manhattan',
+    'Inwood Hill Park, Manhattan',
+    'Isham Street Park, Manhattan',
+    'Academy St, Manhattan',
+    '181st St & Fort Washington Ave, Manhattan',
+    '168th St & Broadway, Manhattan',
+    'Fort Tryon Park, Manhattan',
+    '125th St & Lenox Ave, Manhattan',
+    '125th St & 8th Ave, Manhattan',
+    'Times Square, Manhattan',
+    'Canal St & Broadway, Manhattan',
+    'Houston St & Allen St, Manhattan',
+    '34th St & 7th Ave, Manhattan',
+    'Union Square, Manhattan',
+  ],
+  Brooklyn: [
+    'Bedford Ave & N 7th St, Brooklyn',
+    'Flatbush Ave & Church Ave, Brooklyn',
+    'Atlantic Ave & 4th Ave, Brooklyn',
+    'Fulton St & Nostrand Ave, Brooklyn',
+    'Bay Ridge Ave & 5th Ave, Brooklyn',
+    'Myrtle Ave & Broadway, Brooklyn',
+    'Eastern Pkwy & Utica Ave, Brooklyn',
+    'Kings Hwy & McDonald Ave, Brooklyn',
+    'Brighton Beach Ave, Brooklyn',
+    'Coney Island Boardwalk, Brooklyn',
+  ],
+  Bronx: [
+    'Grand Concourse & 161st St, Bronx',
+    'Fordham Rd & Jerome Ave, Bronx',
+    'Pelham Pkwy & White Plains Rd, Bronx',
+    'Tremont Ave & 3rd Ave, Bronx',
+    'Gun Hill Rd & Boston Rd, Bronx',
+    'Mosholu Pkwy, Bronx',
+    'East Tremont Ave & Southern Blvd, Bronx',
+    'Hunts Point Ave, Bronx',
+    'Riverdale Ave & 263rd St, Bronx',
+    'Westchester Ave & Southern Blvd, Bronx',
+  ],
+  Queens: [
+    'Roosevelt Ave & Jackson Heights, Queens',
+    'Main St & Roosevelt Ave, Queens',
+    'Jamaica Ave & Parsons Blvd, Queens',
+    'Astoria Blvd & 31st St, Queens',
+    'Junction Blvd & Northern Blvd, Queens',
+    'Hillside Ave & 168th St, Queens',
+    'Rockaway Beach Blvd, Queens',
+    'Springfield Blvd & Farmers Blvd, Queens',
+    'Union Tpke & Parsons Blvd, Queens',
+    'Queens Blvd & Woodhaven Blvd, Queens',
+  ],
+  'Staten Island': [
+    'Bay St & Victory Blvd, Staten Island',
+    'Forest Ave & Castleton Ave, Staten Island',
+    'Richmond Ave & Richmond Terrace, Staten Island',
+    'Hylan Blvd & New Dorp Lane, Staten Island',
+    'Arthur Kill Rd & Richmond Ave, Staten Island',
+    'Stapleton Waterfront, Staten Island',
+    'St George Ferry Terminal, Staten Island',
+    'Manor Rd & Richmond Ave, Staten Island',
+  ],
+};
+
+/**
+ * populateLocations(boroughSelect)
+ * Called when the user picks a borough.
+ * Fills the location <select> with streets for that borough.
+ */
+function populateLocations(boroughSelect) {
+  const borough      = boroughSelect.value;
+  const step2        = document.getElementById('location-step2');
+  const locSelect    = document.getElementById('form-location');
+  const customInput  = document.getElementById('custom-location-input');
+
+  // Reset custom input
+  customInput.classList.add('hidden');
+  customInput.required = false;
+  customInput.value = '';
+
+  if (!borough) {
+    step2.classList.add('hidden');
+    locSelect.innerHTML = '<option value="">— Select a street / spot —</option>';
+    return;
+  }
+
+  const streets = LOCATIONS_BY_BOROUGH[borough] || [];
+  locSelect.innerHTML =
+    '<option value="">— Select a street / spot —</option>' +
+    streets.map(s => `<option value="${s}">${s}</option>`).join('') +
+    '<option value="other">📝 Type a different address…</option>';
+
+  step2.classList.remove('hidden');
+}
+
+/** Show/hide the free-text custom address field */
+function toggleCustomLocation(select) {
+  const custom = document.getElementById('custom-location-input');
+  if (select.value === 'other') {
+    custom.classList.remove('hidden');
+    custom.required = true;
+  } else {
+    custom.classList.add('hidden');
+    custom.required = false;
+    custom.value = '';
+  }
+}
+
+/**
+ * submitReport(e)
+ * Reads the form, builds the report object, saves it,
+ * awards points, and moves to Step 3 (success).
+ */
+function submitReport(e) {
+  e.preventDefault();
+
+  const wasteType    = document.getElementById('form-waste-type').value;
+  const borough      = document.getElementById('form-borough').value;
+  const locationSel  = document.getElementById('form-location').value;
+  const customLoc    = document.getElementById('custom-location-input').value.trim();
+  const location     = locationSel === 'other' ? customLoc : locationSel;
+  const notes        = document.getElementById('form-notes').value.trim();
+  const photo        = document.getElementById('current-photo-data').value;
+
+  if (!wasteType || !borough || !location) return;
+
+  // Glass and Metal earn bonus points (harder to carry / more impactful)
+  const pts = ['Glass', 'Metal'].includes(wasteType) ? 15 : 10;
+
+  const report = {
+    id:       'user-' + Date.now(),
+    date:     new Date().toISOString().split('T')[0],
+    borough,
+    wasteType,
+    location,
+    notes,
+    points:   pts,
+    photo,
+    isSeeded: false,
+  };
+
+  saveUserReport(report);
+  addPoints(pts);
+
+  // Update success screen text
+  document.getElementById('points-earned-display').textContent = '+' + pts + ' pts';
+  document.getElementById('total-points-display').textContent  = getUserPoints() + ' pts';
+
+  // Move to Step 3
+  document.getElementById('scan-step2').classList.add('hidden');
+  document.getElementById('scan-step3').classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+/** Called by "Scan Another" button on the success screen */
+function startNewScan() {
+  resetScanFlow();
+}
+
+/** Resets the entire scan flow back to Step 1 */
+function resetScanFlow() {
+  document.getElementById('scan-step1').classList.remove('hidden');
+  document.getElementById('scan-step2').classList.add('hidden');
+  document.getElementById('scan-step3').classList.add('hidden');
+  document.getElementById('live-camera-area').classList.add('hidden');
+  document.getElementById('file-input-area').classList.remove('hidden');
+  const form = document.getElementById('report-form');
+  if (form) form.reset();
+  document.getElementById('current-photo-data').value = '';
+  document.getElementById('custom-location-input').classList.add('hidden');
+  // Hide location step 2 until a borough is picked again
+  document.getElementById('location-step2').classList.add('hidden');
+}
+
+/* ════════════════════════════════════════════════════════
+   REPORTS RENDERING
+════════════════════════════════════════════════════════ */
+
+const WASTE_ICON = { Plastic:'🥤', Paper:'📄', Glass:'🍾', Metal:'🥫', Organic:'🍌', Other:'♻️' };
+
+// Tailwind color classes for each waste type badge
+const WASTE_BADGE = {
+  Plastic: 'bg-blue-50  border-blue-100  text-blue-700',
+  Paper:   'bg-yellow-50 border-yellow-100 text-yellow-700',
+  Glass:   'bg-cyan-50  border-cyan-100  text-cyan-700',
+  Metal:   'bg-stone-50 border-stone-200 text-stone-600',
+  Organic: 'bg-green-50 border-green-100 text-green-700',
+  Other:   'bg-purple-50 border-purple-100 text-purple-700',
+};
+
+let activeFilter        = 'all';
+let activeBoroughFilter = 'all';
+
+/** Waste type filter tab clicked */
+function filterReports(filter) {
+  activeFilter = filter;
+
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    const isActive = tab.dataset.filter === filter;
+    tab.classList.toggle('bg-primary',   isActive);
+    tab.classList.toggle('text-white',   isActive);
+    tab.classList.toggle('bg-stone-100', !isActive);
+    tab.classList.toggle('text-earth',   !isActive);
+  });
+
+  renderReports();
+}
+
+/** Borough filter tab clicked */
+function filterBorough(borough) {
+  activeBoroughFilter = borough;
+
+  document.querySelectorAll('.borough-tab').forEach(tab => {
+    const isActive = tab.dataset.borough === borough;
+    tab.classList.toggle('bg-earth-dark', isActive);
+    tab.classList.toggle('text-white',    isActive);
+    tab.classList.toggle('bg-stone-100',  !isActive);
+    tab.classList.toggle('text-earth',    !isActive);
+  });
+
+  renderReports();
+}
+
+/**
+ * renderReports()
+ * Builds the HTML list of report cards for the Reports page.
+ * Sorts most-recent-first, then applies both active filters.
+ */
+function renderReports() {
+  // getAllReports() already returns newest-first
+  const allReports = getAllReports();
+
+  // Apply waste type filter
+  let filtered = activeFilter === 'all'
+    ? allReports
+    : allReports.filter(r => r.wasteType === activeFilter);
+
+  // Apply borough filter
+  if (activeBoroughFilter !== 'all') {
+    filtered = filtered.filter(r => r.borough === activeBoroughFilter);
+  }
+
+  // Update count badge
+  document.getElementById('reports-count-badge').textContent = filtered.length;
+
+  const listEl  = document.getElementById('reports-list');
+  const emptyEl = document.getElementById('reports-empty');
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+
+  listEl.innerHTML = filtered.map(report => {
+    const icon       = WASTE_ICON[report.wasteType]  || '♻️';
+    const badgeCls   = WASTE_BADGE[report.wasteType] || 'bg-stone-50 border-stone-200 text-stone-600';
+    const isUserOwn  = !report.isSeeded;
+
+    // Left thumbnail: real photo if user's own report, else emoji placeholder
+    const thumb = (report.photo && isUserOwn)
+      ? `<img src="${report.photo}" alt="${report.wasteType}" class="w-14 h-14 rounded-xl object-cover shrink-0 border border-stone-200" />`
+      : `<div class="w-14 h-14 rounded-xl bg-stone-100 flex items-center justify-center text-2xl shrink-0">${icon}</div>`;
+
+    return `
+      <div class="flex gap-3 bg-white border border-stone-100 rounded-2xl p-3.5 shadow-sm">
+        ${thumb}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeCls}">
+              ${icon} ${report.wasteType}
+            </span>
+            <span class="text-xs font-bold text-primary shrink-0">+${report.points} pts</span>
+          </div>
+          <div class="text-xs text-earth font-medium truncate">📍 ${report.location}</div>
+          ${report.notes ? `<div class="text-xs text-earth/65 mt-0.5 line-clamp-1">${report.notes}</div>` : ''}
+          <div class="flex items-center justify-between mt-1.5">
+            <span class="text-xs text-stone-400">${formatDate(report.date)}</span>
+            ${isUserOwn
+              ? '<span class="text-xs text-primary font-semibold">✓ Your report</span>'
+              : '<span class="text-xs text-stone-400">Community</span>'}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/** Format "2026-04-03" → "Apr 3, 2026" */
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+/* ════════════════════════════════════════════════════════
+   HOME PAGE RENDERING
+════════════════════════════════════════════════════════ */
+
+function renderHomePage() {
+  const all      = getAllReports();
+  const totalPts = getUserPoints();
+
+  // Stats pills
+  const el1 = document.getElementById('home-stat-reports');
+  const el2 = document.getElementById('home-stat-pts');
+  if (el1) el1.textContent = all.length;
+  if (el2) el2.textContent = totalPts;
+
+  // Recent 3 reports
+  const recentEl    = document.getElementById('home-recent');
+  const recentEmpty = document.getElementById('home-recent-empty');
+  if (!recentEl) return;
+
+  if (all.length === 0) {
+    recentEl.innerHTML = '';
+    if (recentEmpty) recentEmpty.classList.remove('hidden');
+    return;
+  }
+  if (recentEmpty) recentEmpty.classList.add('hidden');
+
+  recentEl.innerHTML = all.slice(0, 3).map(r => {
+    const icon     = WASTE_ICON[r.wasteType] || '♻️';
+    const badgeCls = WASTE_BADGE[r.wasteType] || 'bg-stone-50 border-stone-200 text-stone-600';
+    const thumb    = r.photo
+      ? `<img src="${r.photo}" alt="${r.wasteType}" class="w-12 h-12 rounded-xl object-cover shrink-0 border border-stone-100" />`
+      : `<div class="w-12 h-12 bg-primary-light rounded-xl flex items-center justify-center text-xl shrink-0">${icon}</div>`;
+    return `
+      <div class="flex items-center gap-3 bg-white border border-stone-100 rounded-2xl p-3 shadow-sm">
+        ${thumb}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 mb-0.5">
+            <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${badgeCls}">${icon} ${r.wasteType}</span>
+          </div>
+          <div class="text-xs text-earth truncate">📍 ${r.location}</div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-xs font-bold text-primary">+${r.points} pts</div>
+          <div class="text-[10px] text-stone-400 mt-0.5">${formatDate(r.date)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════════════
+   IMPACT PAGE RENDERING
+════════════════════════════════════════════════════════ */
+
+const BADGES = [
+  { id:'first-scan',  emoji:'🥉', name:'First Scan',             desc:'1 report submitted',    minReports:1,  specialType:null },
+  { id:'eco-rookie',  emoji:'🌱', name:'Eco Rookie',              desc:'3 reports submitted',   minReports:3,  specialType:null },
+  { id:'block-hero',  emoji:'🌿', name:'Block Hero',              desc:'5 reports submitted',   minReports:5,  specialType:null },
+  { id:'guardian',    emoji:'🌳', name:'Neighborhood Guardian',   desc:'10 reports submitted',  minReports:10, specialType:null },
+  { id:'legend',      emoji:'🏆', name:'NYC Legend',               desc:'25 reports submitted',  minReports:25, specialType:null },
+  { id:'plastic',     emoji:'♻️', name:'Plastic Buster',          desc:'3+ plastic items',      minReports:0,  specialType:'Plastic', specialCount:3 },
+];
+
+const LEVELS = [
+  { min:0,   emoji:'🌱', name:'Eco Beginner',          next:'50 pts to Eco Rookie'                 },
+  { min:50,  emoji:'🌿', name:'Eco Rookie',             next:'100 pts to Block Hero'                },
+  { min:100, emoji:'🌳', name:'Block Hero',             next:'200 pts to Neighborhood Guardian'     },
+  { min:200, emoji:'🏅', name:'Neighborhood Guardian',  next:'500 pts to NYC Legend'                },
+  { min:500, emoji:'🏆', name:'NYC Legend',             next:'Maximum level — you\'re a legend! 🎉' },
+];
+
+function renderImpact() {
+  const userReports = getUserReports();
+  const pts         = getUserPoints();
+
+  // Show welcome bonus banner once (flag cleared after showing)
+  const banner = document.getElementById('welcome-bonus-banner');
+  if (banner && localStorage.getItem('ecoscan_show_banner') === '1') {
+    banner.classList.remove('hidden');
+    localStorage.removeItem('ecoscan_show_banner');
+  } else if (banner) {
+    banner.classList.add('hidden');
+  }
+
+  // ── Points hero card ──
+  document.getElementById('impact-points').textContent      = pts;
+  document.getElementById('impact-points-stat').textContent = pts;
+  document.getElementById('impact-user-count').textContent  = userReports.length;
+
+  // Find current level and next
+  let level    = LEVELS[0];
+  let nextLevel = LEVELS[1];
+  LEVELS.forEach((l, i) => {
+    if (pts >= l.min) { level = l; nextLevel = LEVELS[i + 1] || null; }
+  });
+  document.getElementById('impact-level-emoji').textContent = level.emoji;
+  document.getElementById('impact-level-name').textContent  = level.name;
+
+  // Progress bar toward next level
+  const bar      = document.getElementById('impact-progress-bar');
+  const nextLbl  = document.getElementById('impact-level-next');
+  const prgLbl   = document.getElementById('impact-progress-label');
+  if (nextLevel) {
+    const span = nextLevel.min - level.min;
+    const done = pts - level.min;
+    const pct  = Math.min(100, Math.round((done / span) * 100));
+    bar.style.width   = pct + '%';
+    nextLbl.textContent = 'Next: ' + nextLevel.name;
+    prgLbl.textContent  = pts + ' / ' + nextLevel.min + ' pts';
+  } else {
+    bar.style.width   = '100%';
+    nextLbl.textContent = '🏆 Maximum level reached!';
+    prgLbl.textContent  = '';
+  }
+
+  // ── Badges ──
+  let earnedCount = 0;
+  const badgesEl  = document.getElementById('badges-grid');
+  badgesEl.innerHTML = BADGES.map(badge => {
+    let earned = false;
+    if (badge.specialType) {
+      earned = userReports.filter(r => r.wasteType === badge.specialType).length >= badge.specialCount;
+    } else {
+      earned = userReports.length >= badge.minReports;
+    }
+    if (earned) earnedCount++;
+    return `
+      <div class="bg-white border-2 ${earned ? 'border-primary shadow-sm' : 'border-stone-100'} rounded-2xl p-3 text-center transition-all ${earned ? '' : 'opacity-35'}">
+        <div class="text-2xl mb-1">${badge.emoji}</div>
+        <div class="text-[10px] font-bold ${earned ? 'text-earth-dark' : 'text-stone-400'} leading-tight">${badge.name}</div>
+        ${earned ? `<div class="mt-1.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center text-white text-[9px] mx-auto font-bold">✓</div>` : ''}
+      </div>`;
+  }).join('');
+  document.getElementById('impact-badges-count').textContent = earnedCount;
+
+  // ── Activity feed (photo + details for each user report) ──
+  const feedEl  = document.getElementById('activity-feed');
+  const emptyAc = document.getElementById('activity-empty');
+  if (userReports.length === 0) {
+    feedEl.innerHTML = '';
+    emptyAc.classList.remove('hidden');
+  } else {
+    emptyAc.classList.add('hidden');
+    feedEl.innerHTML = userReports.map(r => {
+      const icon      = WASTE_ICON[r.wasteType] || '♻️';
+      const badgeCls  = WASTE_BADGE[r.wasteType] || 'bg-stone-50 border-stone-200 text-stone-600';
+      const thumb     = r.photo
+        ? `<img src="${r.photo}" alt="${r.wasteType}" class="w-full h-36 object-cover rounded-t-2xl" />`
+        : `<div class="w-full h-24 rounded-t-2xl flex items-center justify-center text-4xl" style="background:#d1fae5;">${icon}</div>`;
+      return `
+        <div class="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
+          ${thumb}
+          <div class="p-3.5">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeCls}">
+                ${icon} ${r.wasteType}
+              </span>
+              <span class="text-xs font-bold text-primary shrink-0">+${r.points} pts</span>
+            </div>
+            <div class="text-xs text-earth font-medium truncate mb-0.5">📍 ${r.location}</div>
+            ${r.notes ? `<div class="text-xs text-earth/60 line-clamp-1">${r.notes}</div>` : ''}
+            <div class="text-xs text-stone-400 mt-1.5">${formatDate(r.date)}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Waste breakdown ──
+  const breakdownEl = document.getElementById('waste-breakdown');
+  const emptyEl     = document.getElementById('breakdown-empty');
+  if (userReports.length === 0) {
+    breakdownEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+  } else {
+    emptyEl.classList.add('hidden');
+    const counts = {};
+    userReports.forEach(r => { counts[r.wasteType] = (counts[r.wasteType] || 0) + 1; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    breakdownEl.innerHTML = sorted.map(([type, count]) => {
+      const pct  = Math.round((count / userReports.length) * 100);
+      const icon = WASTE_ICON[type] || '♻️';
+      return `
+        <div>
+          <div class="flex items-center justify-between text-sm mb-1.5">
+            <span class="text-earth">${icon} ${type}</span>
+            <span class="text-primary font-semibold text-xs">${count} report${count > 1 ? 's' : ''} · ${pct}%</span>
+          </div>
+          <div class="h-2 bg-stone-100 rounded-full overflow-hidden">
+            <div class="h-full bg-primary rounded-full transition-all duration-700" style="width:${pct}%"></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Borough leaderboard ──
+  renderLeaderboard();
+}
+
+/* ════════════════════════════════════════════════════════
+   BOROUGH LEADERBOARD
+════════════════════════════════════════════════════════ */
+
+function renderLeaderboard() {
+  const allReports = getUserReports(); // only real reports
+
+  // Count reports per borough
+  const counts = {};
+  const BOROUGHS = ['Manhattan', 'Brooklyn', 'Bronx', 'Queens', 'Staten Island'];
+  const BOROUGH_EMOJI = {
+    Manhattan:      '🌆',
+    Brooklyn:       '🌉',
+    Bronx:          '🏟️',
+    Queens:         '✈️',
+    'Staten Island':'🚢',
+  };
+
+  BOROUGHS.forEach(b => { counts[b] = 0; });
+  allReports.forEach(r => {
+    if (r.borough && counts[r.borough] !== undefined) counts[r.borough]++;
+  });
+
+  // Sort highest → lowest
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const maxCount = sorted[0][1] || 1; // avoid divide-by-zero
+
+  // Medal for top 3
+  const medals = ['🥇', '🥈', '🥉'];
+
+  const el = document.getElementById('borough-leaderboard');
+  if (!el) return;
+
+  // If no reports at all yet
+  if (allReports.length === 0) {
+    el.innerHTML = `<div class="text-center py-4 text-earth text-sm">Submit reports to see borough rankings!</div>`;
+    return;
+  }
+
+  el.innerHTML = sorted.map(([borough, count], i) => {
+    const pct    = Math.round((count / maxCount) * 100);
+    const medal  = medals[i] || `#${i + 1}`;
+    const isTop  = i === 0;
+
+    return `
+      <div class="flex items-center gap-3 ${isTop ? 'bg-primary-light border border-emerald-200' : 'bg-stone-50 border border-stone-100'} rounded-xl px-3 py-2.5">
+        <!-- Rank medal / number -->
+        <div class="text-xl w-7 text-center shrink-0">${medal}</div>
+
+        <!-- Borough name + bar -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-semibold ${isTop ? 'text-emerald-900' : 'text-earth-dark'}">
+              ${BOROUGH_EMOJI[borough]} ${borough}
+            </span>
+            <span class="text-xs font-bold ${isTop ? 'text-primary' : 'text-earth'} shrink-0 ml-2">
+              ${count} report${count !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <!-- Progress bar showing relative amount vs #1 -->
+          <div class="h-1.5 bg-white rounded-full overflow-hidden border border-stone-200">
+            <div class="h-full rounded-full transition-all duration-700 ${isTop ? 'bg-primary' : 'bg-stone-300'}"
+                 style="width:${pct}%"></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════════════
+   MAP (LEAFLET.JS)
+════════════════════════════════════════════════════════ */
+
+let leafletMap     = null;
+let mapInitialized = false;
+
+/** Approximate GPS coords for the location dropdown options */
+const LOCATION_COORDS = {
+  'Dyckman St & Broadway, Inwood':                    [40.8655, -73.9237],
+  '207th St & Sherman Ave, Inwood':                   [40.8680, -73.9197],
+  'Isham Street Park, Inwood':                        [40.8692, -73.9226],
+  'Seaman Ave & Dyckman St, Inwood':                  [40.8660, -73.9268],
+  'Academy St, Inwood':                               [40.8672, -73.9207],
+  'Post Ave, Inwood':                                 [40.8688, -73.9176],
+  'Nagle Ave, Inwood':                                [40.8668, -73.9216],
+  'Indian Rd, Inwood':                                [40.8701, -73.9289],
+  'Inwood Hill Park':                                 [40.8720, -73.9308],
+  '181st St & Fort Washington Ave, Washington Heights':[40.8494, -73.9376],
+  '181st St & Broadway, Washington Heights':          [40.8499, -73.9413],
+  '168th St & Broadway, Washington Heights':          [40.8406, -73.9413],
+  'St Nicholas Ave & 181st St, Washington Heights':   [40.8490, -73.9360],
+  'Audubon Ave & 181st St, Washington Heights':       [40.8492, -73.9345],
+  'Amsterdam Ave & 181st St, Washington Heights':     [40.8488, -73.9391],
+  'Fort Tryon Park, Washington Heights':              [40.8620, -73.9327],
+  'Bennett Ave, Washington Heights':                  [40.8510, -73.9352],
+};
+
+/**
+ * initMap()
+ * Creates the Leaflet map on first call.
+ * On subsequent calls, just refreshes the markers.
+ *
+ * IMPORTANT: this must be called AFTER the map page is visible
+ * (the container needs a non-zero height for Leaflet to initialize).
+ */
+function initMap() {
+  if (!mapInitialized) {
+    // Centered over NYC, zoom 11 shows all 5 boroughs
+    leafletMap = L.map('map-container', { zoomControl: true })
+                  .setView([40.7128, -74.0060], 11);
+
+    // OpenStreetMap tiles — 100% free, no API key
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(leafletMap);
+
+    mapInitialized = true;
+  }
+
+  // Clear existing markers, then re-add (in case new reports were submitted)
+  leafletMap.eachLayer(layer => {
+    if (layer instanceof L.Marker) leafletMap.removeLayer(layer);
+  });
+
+  addMarkersToMap();
+}
+
+/** Places an emoji pin for every report from getAllReports() */
+function addMarkersToMap() {
+  if (!leafletMap) return;
+
+  getAllReports().forEach(report => {
+    // Look up exact coords; fall back to random offset near neighborhood center
+    let coords = LOCATION_COORDS[report.location];
+    if (!coords) {
+      // Fallback: scatter near borough center
+      const BOROUGH_CENTERS = {
+        Manhattan:      [40.783,  -73.967],
+        Brooklyn:       [40.678,  -73.944],
+        Bronx:          [40.837,  -73.865],
+        Queens:         [40.728,  -73.796],
+        'Staten Island':[40.579,  -74.151],
+      };
+      const center = BOROUGH_CENTERS[report.borough] || [40.713, -74.006];
+      coords = [center[0] + (Math.random() - 0.5) * 0.018,
+                center[1] + (Math.random() - 0.5) * 0.018];
+    }
+
+    const icon = WASTE_ICON[report.wasteType] || '♻️';
+
+    // Custom round emoji marker
+    const customIcon = L.divIcon({
+      className: '',
+      html: `<div style="background:white;border:2.5px solid #10b981;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 10px rgba(0,0,0,0.22);cursor:pointer;">${icon}</div>`,
+      iconSize:   [34, 34],
+      iconAnchor: [17, 17],
+      popupAnchor:[0, -20],
+    });
+
+    L.marker(coords, { icon: customIcon })
+      .addTo(leafletMap)
+      .bindPopup(`
+        <div style="font-family:Inter,sans-serif;min-width:180px;padding:2px 0">
+          <div style="font-weight:700;font-size:14px;margin-bottom:5px">${icon} ${report.wasteType}</div>
+          <div style="font-size:12px;color:#78716c;margin-bottom:3px">📍 ${report.location}</div>
+          ${report.notes ? `<div style="font-size:12px;color:#78716c;margin-bottom:3px;font-style:italic">"${report.notes}"</div>` : ''}
+          <div style="font-size:11px;color:#a8a29e;margin-top:4px;display:flex;justify-content:space-between;">
+            <span>${formatDate(report.date)}</span>
+            <span style="color:#10b981;font-weight:600">+${report.points} pts</span>
+          </div>
+        </div>
+      `);
+  });
+}
+
+/* ════════════════════════════════════════════════════════
+   APP INITIALIZATION
+═══════════════════════════════════════════════════���════ */
+
+function init() {
+  // Give welcome bonus on very first visit
+  giveWelcomeBonus(); // sets 10 pts if not already set
+
+  // Start on the Home page
+  showPage('home');
+  console.log('🌿 EcoScan NYC loaded');
+}
+
+// Wait for the HTML to be fully parsed before running init
+document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
