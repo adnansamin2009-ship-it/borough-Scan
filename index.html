@@ -3,7 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>EcoScan NYC — Clean NYC One Scan at a Time</title>
+  <title>Borough Scan</title>
+
+  <!-- PWA / Home Screen meta tags ─────────────────────── -->
+  <meta name="theme-color" content="#059669" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Borough Scan" />
+  <!-- Icon + manifest injected by setupPWA() in JS at the bottom -->
+  <link id="pwa-manifest" rel="manifest" />
+  <link id="pwa-icon"     rel="apple-touch-icon" sizes="192x192" />
+  <link id="pwa-icon-180" rel="apple-touch-icon" sizes="180x180" />
+  <link id="pwa-favicon"  rel="icon" type="image/png" sizes="192x192" />
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -99,10 +111,35 @@
 
       <!-- Logo / home button -->
       <button onclick="showPage('home')" class="flex items-center gap-2 shrink-0">
-        <span class="text-2xl leading-none">🌿</span>
-        <span class="font-display text-white text-[16px] font-bold tracking-tight leading-none">
-          EcoScan <span class="text-white font-extrabold">NYC</span>
-        </span>
+        <!--
+          Logo icon: white rounded square with a green recycling symbol inside.
+          This mimics a real app icon shape in the nav bar.
+          No image file needed — pure HTML/CSS.
+        -->
+        <div style="
+          width: 32px; height: 32px;
+          background: white;
+          border-radius: 8px;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+          flex-shrink: 0;
+        ">
+          <!-- SVG recycling / location pin hybrid icon in brand green -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Map pin shape -->
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+                  fill="#059669"/>
+            <!-- Leaf inside the pin -->
+            <path d="M12 6.5c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5S13.38 6.5 12 6.5z"
+                  fill="white"/>
+          </svg>
+        </div>
+
+        <!-- App name -->
+        <div class="leading-none">
+          <div class="font-display text-white font-extrabold text-[15px] tracking-tight">Borough Scan</div>
+          <div class="text-white/60 text-[9px] font-semibold tracking-widest uppercase" style="margin-top:1px;">New York City</div>
+        </div>
       </button>
 
       <!-- Desktop nav links (hidden on mobile — use bottom tab bar instead) -->
@@ -615,7 +652,7 @@
       <!-- Welcome bonus banner (shown once) -->
       <div id="welcome-bonus-banner"
            class="hidden bg-white/15 border border-white/25 rounded-xl px-3 py-2 mb-4 flex items-center gap-2 text-xs font-semibold">
-        🎉 Welcome bonus! You got +10 points for joining EcoScan NYC.
+        🎉 Welcome bonus! You got +10 points for joining Borough Scan.
       </div>
 
       <div class="flex items-center justify-between relative z-10 mb-4">
@@ -727,7 +764,7 @@
   <div id="page-about" class="page">
 
     <div class="px-4 pt-6 pb-4">
-      <h2 class="font-display text-2xl text-earth-dark mb-1">About EcoScan NYC ℹ️</h2>
+      <h2 class="font-display text-2xl text-earth-dark mb-1">About Borough Scan ℹ️</h2>
       <p class="text-earth text-sm">Why we built this — and why it matters.</p>
     </div>
 
@@ -740,7 +777,7 @@
           New York City generates millions of pounds of street litter every year. Litter isn't just ugly — it clogs drains and causes flooding, harms animals, pollutes our soil and waterways, and makes neighborhoods feel unsafe and unloved.
         </p>
         <p class="text-emerald-800 text-sm leading-relaxed">
-          Most people want cleaner streets, but there was never a simple, fast way to report litter from your phone. <strong>EcoScan changes that.</strong>
+          Most people want cleaner streets, but there was never a simple, fast way to report litter from your phone. <strong>Borough Scan changes that.</strong>
         </p>
       </div>
 
@@ -748,7 +785,7 @@
       <div class="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
         <h3 class="font-display text-base text-earth-dark mb-2">🎯 Our Goal</h3>
         <p class="text-earth text-sm leading-relaxed mb-3">
-          EcoScan NYC gives every New Yorker — in every borough — a simple tool to fight litter in their neighborhood. Take a photo, log the type of waste, and submit it in under 30 seconds.
+          Borough Scan gives every New Yorker — in every borough — a simple tool to fight litter in their neighborhood. Take a photo, log the type of waste, and submit it in under 30 seconds.
         </p>
         <p class="text-earth text-sm leading-relaxed">
           Over time, those reports build a real picture of where litter is worst across the five boroughs — giving communities, schools, and city agencies the data they need to take action.
@@ -757,7 +794,7 @@
 
       <!-- What makes it different -->
       <div class="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
-        <h3 class="font-display text-base text-earth-dark mb-3">✨ What Makes EcoScan Different</h3>
+        <h3 class="font-display text-base text-earth-dark mb-3">✨ What Makes Borough Scan Different</h3>
         <div class="space-y-3">
           <div class="flex gap-3 text-sm text-earth">
             <span class="text-primary font-bold shrink-0 text-base">📷</span>
@@ -780,7 +817,7 @@
 
       <!-- How to use -->
       <div class="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
-        <h3 class="font-display text-base text-earth-dark mb-3">📖 How to Use EcoScan</h3>
+        <h3 class="font-display text-base text-earth-dark mb-3">📖 How to Use Borough Scan</h3>
         <ol class="space-y-2.5 text-sm text-earth">
           <li class="flex gap-2.5"><span class="text-primary font-bold shrink-0">1.</span>Go to the <strong class="text-earth-dark">Scan</strong> tab and take a photo of litter near you.</li>
           <li class="flex gap-2.5"><span class="text-primary font-bold shrink-0">2.</span>Choose your <strong class="text-earth-dark">borough</strong>, then select the nearest street or location.</li>
@@ -805,7 +842,7 @@
       <!-- Footer card -->
       <div class="rounded-2xl p-5 text-center text-white shadow-sm" style="background:#059669;">
         <div class="text-3xl mb-2">🌿</div>
-        <div class="font-display text-base font-bold mb-1">EcoScan NYC</div>
+        <div class="font-display text-base font-bold mb-1">Borough Scan</div>
         <p class="text-white/75 text-xs leading-relaxed">
           Built by a student from New York City.<br/>
           Real code. Real problem. Real impact.
@@ -1797,13 +1834,108 @@ function addMarkersToMap() {
    APP INITIALIZATION
 ═══════════════════════════════════════════════════���════ */
 
+/* ════════════════════════════════════════════════════════
+   PWA SETUP — generates app icon via canvas + injects manifest
+   This runs once on load so no separate icon/manifest files
+   are needed (everything lives in this single HTML file).
+════════════════════════════════════════════════════════ */
+function setupPWA() {
+  /* ── Draw the app icon on a canvas ────────────────────
+     Result: green rounded square, white location-pin shape,
+     "BS" letters in white — looks great as a home-screen icon.
+  ──────────────────────────────────────────────────────── */
+  const SIZE = 512;
+  const c    = document.createElement('canvas');
+  c.width    = SIZE;
+  c.height   = SIZE;
+  const ctx  = c.getContext('2d');
+
+  // 1. Rounded green background
+  const R = 100; // corner radius
+  ctx.fillStyle = '#059669';
+  ctx.beginPath();
+  ctx.moveTo(R, 0);
+  ctx.lineTo(SIZE - R, 0);
+  ctx.quadraticCurveTo(SIZE, 0, SIZE, R);
+  ctx.lineTo(SIZE, SIZE - R);
+  ctx.quadraticCurveTo(SIZE, SIZE, SIZE - R, SIZE);
+  ctx.lineTo(R, SIZE);
+  ctx.quadraticCurveTo(0, SIZE, 0, SIZE - R);
+  ctx.lineTo(0, R);
+  ctx.quadraticCurveTo(0, 0, R, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. White location-pin head (circle)
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.arc(SIZE / 2, 195, 130, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. White pin body (triangle pointing down)
+  ctx.beginPath();
+  ctx.moveTo(SIZE / 2 - 110, 280);
+  ctx.lineTo(SIZE / 2 + 110, 280);
+  ctx.lineTo(SIZE / 2,        440);
+  ctx.closePath();
+  ctx.fill();
+
+  // 4. Green inner circle (dot in centre of pin head)
+  ctx.fillStyle = '#059669';
+  ctx.beginPath();
+  ctx.arc(SIZE / 2, 195, 58, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 5. White "BS" text inside the green dot
+  ctx.fillStyle   = 'white';
+  ctx.font        = 'bold 68px Inter, Arial, sans-serif';
+  ctx.textAlign   = 'center';
+  ctx.textBaseline= 'middle';
+  ctx.fillText('BS', SIZE / 2, 200);
+
+  // Export to PNG data URL
+  const iconDataURL = c.toDataURL('image/png');
+
+  // ── Inject icon into <link> tags already in <head> ──
+  ['pwa-icon', 'pwa-icon-180', 'pwa-favicon'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.href = iconDataURL;
+  });
+
+  // ── Create a Web App Manifest as a Blob and inject it ──
+  // This tells Chrome/Android "this is an installable PWA".
+  // iOS reads the apple-touch-icon link tag above instead.
+  const manifest = {
+    name:             'Borough Scan',
+    short_name:       'Borough Scan',
+    description:      'Report litter across NYC — earn points, track impact.',
+    start_url:        './',
+    scope:            './',
+    display:          'standalone',          // hides browser chrome
+    background_color: '#059669',
+    theme_color:      '#059669',
+    orientation:      'portrait',
+    icons: [
+      { src: iconDataURL, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: iconDataURL, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+    ],
+  };
+
+  const blob       = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+  const manifestEl = document.getElementById('pwa-manifest');
+  if (manifestEl) manifestEl.href = URL.createObjectURL(blob);
+}
+
 function init() {
   // Give welcome bonus on very first visit
-  giveWelcomeBonus(); // sets 10 pts if not already set
+  giveWelcomeBonus();
+
+  // Generate app icon + manifest (fixes home-screen "E" letter problem)
+  setupPWA();
 
   // Start on the Home page
   showPage('home');
-  console.log('🌿 EcoScan NYC loaded');
+  console.log('Borough Scan loaded ✅');
 }
 
 // Wait for the HTML to be fully parsed before running init
